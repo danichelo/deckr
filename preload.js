@@ -16,6 +16,12 @@ contextBridge.exposeInMainWorld('presenter', {
   removeRecent: (p) => ipcRenderer.invoke('remove-recent', p),
   clearRecent: () => ipcRenderer.invoke('clear-recent'),
 
+  // Tools (user-registered HTML files, persisted to disk in main)
+  pickToolFile: () => ipcRenderer.invoke('pick-tool-file'),
+  addTool: (name, p) => ipcRenderer.invoke('add-tool', { name, path: p }),
+  getTools: () => ipcRenderer.invoke('get-tools'),
+  removeTool: (p) => ipcRenderer.invoke('remove-tool', p),
+
   // Misc
   appInfo: () => ipcRenderer.invoke('app-info'),
   getSettings: () => ipcRenderer.invoke('get-settings'),

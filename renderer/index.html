@@ -447,6 +447,28 @@ html, body {
 }
 .set-btn:hover { border-color: var(--red); color: #fff; background: var(--red); }
 
+/* ── TOOLS ── distinguishes registered tools from recent files with a glyph */
+.ti-glyph {
+  width: 16px; height: 16px; flex-shrink: 0; color: var(--orange);
+  display: flex; align-items: center; justify-content: center;
+}
+.ti-glyph svg { width: 15px; height: 15px; }
+.recent-item.missing .ti-glyph { color: var(--dim); }
+
+/* Add Tool modal */
+.at-file {
+  font-size: 10px; color: var(--dim); margin-bottom: 14px;
+  word-break: break-all; line-height: 1.5;
+}
+.at-input {
+  width: 100%; padding: 10px 12px; margin-bottom: 18px;
+  background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px;
+  color: var(--off-white); font-family: 'Geist', sans-serif; font-size: 13px; outline: none;
+  user-select: text; -webkit-user-select: text;
+}
+.at-input:focus { border-color: var(--orange); }
+.at-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
 /* ── PRESENTATION LOCK (pure content view) ── */
 #viewer.locked #viewer-bar,
 #viewer.locked #viewer-toolbar { display: none !important; }
@@ -511,6 +533,14 @@ html, body {
       <div class="drop-title">Drop to Present</div>
       <div class="drop-sub">Drag any HTML file onto this window<br>or browse your files below</div>
       <button class="open-btn" onclick="event.stopPropagation(); openFile()"><span>+</span> Open File</button>
+    </div>
+
+    <div class="recent-wrap">
+      <div class="recent-hdr">
+        <span class="recent-label">Tools</span>
+        <button class="clear-recent" id="add-tool-btn" onclick="startAddTool()">+ Add</button>
+      </div>
+      <div id="tools-list"></div>
     </div>
 
     <div class="recent-wrap">
@@ -673,6 +703,21 @@ html, body {
   </div>
 </div>
 
+<!-- ADD TOOL -->
+<div id="add-tool" class="sheet" onclick="if(event.target===this) closeSheet('add-tool')">
+  <div class="sheet-card">
+    <button class="sheet-close" onclick="closeSheet('add-tool')">×</button>
+    <div class="sheet-title">Add Tool</div>
+    <div class="at-file" id="at-file"></div>
+    <input id="at-name" class="at-input" type="text" placeholder="Tool name" spellcheck="false"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();confirmAddTool();}">
+    <div class="at-actions">
+      <button class="err-btn" onclick="confirmAddTool()">Add Tool</button>
+      <button class="err-btn" onclick="closeSheet('add-tool')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let APP_NAME = 'Deckr';
 let GITHUB = 'https://github.com/majorassembly/deckr';
@@ -733,6 +778,55 @@ async function renderRecent() {
 }
 async function removeRecent(p) { await window.presenter.removeRecent(p); renderRecent(); }
 async function clearRecents() { await window.presenter.clearRecent(); renderRecent(); }
+
+// ── Tools (registered HTML files) ──
+const TOOL_GLYPH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>';
+
+async function renderTools() {
+  const el = $('tools-list');
+  const list = await window.presenter.getTools();
+  if (!list.length) { el.innerHTML = '<div class="no-recent">No tools yet — add one with “+ Add”</div>'; return; }
+  el.innerHTML = '';
+  list.forEach(t => {
+    const item = document.createElement('div');
+    item.className = 'recent-item' + (t.exists ? '' : ' missing');
+    item.title = t.path;
+    item.innerHTML =
+      '<span class="ti-glyph">' + TOOL_GLYPH + '</span>' +
+      '<div class="ri-main">' +
+        '<span class="ri-name">' + escapeHtml(t.name) + '</span>' +
+        '<span class="ri-meta">' + escapeHtml(t.path) + (t.exists ? '' : ' · not found') + '</span>' +
+      '</div>' +
+      '<button class="ri-x" title="Remove">×</button>';
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('.ri-x')) return;
+      if (t.exists) window.presenter.openPath(t.path);
+    });
+    item.addEventListener('contextmenu', (e) => { e.preventDefault(); removeTool(t.path); });
+    item.querySelector('.ri-x').addEventListener('click', (e) => { e.stopPropagation(); removeTool(t.path); });
+    el.appendChild(item);
+  });
+}
+async function removeTool(p) { await window.presenter.removeTool(p); renderTools(); }
+
+let pendingToolPath = null;
+async function startAddTool() {
+  const picked = await window.presenter.pickToolFile();
+  if (!picked) return;
+  pendingToolPath = picked.path;
+  $('at-file').textContent = picked.path;
+  $('at-name').value = picked.defaultName || '';
+  $('add-tool').classList.add('on');
+  setTimeout(() => { $('at-name').focus(); $('at-name').select(); }, 50);
+}
+async function confirmAddTool() {
+  const name = ($('at-name').value || '').trim();
+  if (!pendingToolPath || !name) { $('at-name').focus(); return; }
+  await window.presenter.addTool(name, pendingToolPath);
+  pendingToolPath = null;
+  closeSheet('add-tool');
+  renderTools();
+}
 
 // ── Opening ──
 function openFile() { window.presenter.openDialog(); }
@@ -883,6 +977,7 @@ function goHome() {
   document.title = APP_NAME;
   notifyState();
   renderRecent();
+  renderTools();
 }
 function toggleFullscreen() { window.presenter.toggleFullscreen(); }
 
@@ -995,6 +1090,8 @@ document.addEventListener('keydown', e => {
     if (locked) { exitLock(); return; }
     if (isViewing() && !$('error-screen').classList.contains('on')) goHome();
   } else if (e.key === '?') {
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
     openShortcuts();
   }
 });
@@ -1076,9 +1173,10 @@ function anyOverlayOpen() {
   return $('menu-dropdown').classList.contains('on') ||
          $('shortcuts').classList.contains('on') ||
          $('settings').classList.contains('on') ||
+         $('add-tool').classList.contains('on') ||
          $('about').classList.contains('on');
 }
-function closeAllOverlays() { closeMenu(); closeSheet('shortcuts'); closeSheet('settings'); hideAbout(); }
+function closeAllOverlays() { closeMenu(); closeSheet('shortcuts'); closeSheet('settings'); closeSheet('add-tool'); hideAbout(); }
 
 // ── Init ──
 window.presenter.appInfo().then(info => {
@@ -1096,6 +1194,7 @@ window.presenter.getSettings().then(s => {
 });
 $('about-github').addEventListener('click', () => window.presenter.openExternal(GITHUB));
 renderRecent();
+renderTools();
 </script>
 </body>
 </html>

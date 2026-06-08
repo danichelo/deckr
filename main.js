@@ -23,6 +23,7 @@ let locked = false;     // renderer-reported: presentation lock active
 const recentFilePath = () => path.join(app.getPath('userData'), 'recent.json');
 const windowStatePath = () => path.join(app.getPath('userData'), 'window-state.json');
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
+const toolsFilePath = () => path.join(app.getPath('userData'), 'tools.json');
 
 function readJSON(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
@@ -53,6 +54,18 @@ function addRecent(filePath) {
 // Annotate each entry with whether the file still exists (don't prune missing ones).
 function recentWithStatus() {
   return readRecent().map(x => ({ ...x, exists: fs.existsSync(x.path) }));
+}
+
+// ── Tools (user-registered HTML files; permanent, persisted like recents) ──
+function readTools() { return readJSON(toolsFilePath(), []); }
+function writeTools(list) { writeJSON(toolsFilePath(), list); }
+function addTool(name, filePath) {
+  const list = readTools().filter(t => t.path !== filePath); // dedupe by path
+  list.push({ name: name || path.basename(filePath), path: filePath, time: Date.now() });
+  writeTools(list);
+}
+function toolsWithStatus() {
+  return readTools().map(t => ({ ...t, exists: fs.existsSync(t.path) }));
 }
 
 // ── Window state ──
@@ -390,6 +403,20 @@ ipcMain.handle('reload-file', () => { reloadCurrent(false); return true; });
 ipcMain.handle('get-recent', () => recentWithStatus());
 ipcMain.handle('remove-recent', (e, p) => { writeRecent(readRecent().filter(x => x.path !== p)); buildMenu(); return recentWithStatus(); });
 ipcMain.handle('clear-recent', () => { writeRecent([]); buildMenu(); return []; });
+
+// Tools
+ipcMain.handle('pick-tool-file', async () => {
+  const r = await dialog.showOpenDialog(win, {
+    properties: ['openFile'],
+    filters: [{ name: 'HTML Files', extensions: ['html', 'htm'] }],
+  });
+  if (r.canceled || !r.filePaths.length) return null;
+  const p = r.filePaths[0];
+  return { path: p, defaultName: path.basename(p).replace(/\.html?$/i, '') };
+});
+ipcMain.handle('add-tool', (e, { name, path: p }) => { addTool(name, p); return toolsWithStatus(); });
+ipcMain.handle('get-tools', () => toolsWithStatus());
+ipcMain.handle('remove-tool', (e, p) => { writeTools(readTools().filter(t => t.path !== p)); return toolsWithStatus(); });
 ipcMain.handle('app-info', () => appInfo());
 ipcMain.handle('get-settings', () => readSettings());
 ipcMain.handle('set-settings', (e, patch) => { writeSettings(patch); return readSettings(); });
