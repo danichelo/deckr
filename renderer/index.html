@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deckr</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Mona+Sans:wght@300;400;700;800&family=Geist:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #111111;
+  --surface2: #161616;
+  --border: #222;
+  --border2: #2a2a2a;
+  --orange: #F66234;
+  --orange-dim: rgba(246,98,52,0.12);
+  --off-white: #F0EFED;
+  --gray: #A7A3A2;
+  --dim: #444;
+  --dim2: #333;
+  --red: #e81123;
+}
+
+/* Light theme — variable overrides only; the viewer iframe renders HTML as-is. */
+html[data-theme="light"] {
+  --bg: #f5f5f4;
+  --surface: #ffffff;
+  --surface2: #efeeec;
+  --border: #e4e3e0;
+  --border2: #d6d5d2;
+  --off-white: #1b1a19;
+  --gray: #555350;
+  --dim: #8a8784;
+  --dim2: #c2c0bd;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  color: var(--off-white);
+  font-family: 'Geist', sans-serif;
+  font-weight: 300;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ── TITLEBAR (shared look, used by home + viewer bar) ── */
+#titlebar {
+  position: fixed; top: 0; left: 0; right: 0; height: 44px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px 0 18px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+  z-index: 1000;
+}
+.app-wordmark { display: flex; align-items: center; gap: 10px; }
+.app-icon {
+  width: 20px; height: 20px;
+  background: var(--orange);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+.app-name {
+  font-family: 'Mona Sans', sans-serif; font-size: 12px;
+  font-weight: 800; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--off-white);
+}
+.titlebar-center {
+  font-size: 10px; color: var(--dim); letter-spacing: 1px;
+  max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.win-controls { display: flex; gap: 5px; -webkit-app-region: no-drag; }
+.wc {
+  width: 26px; height: 26px; border-radius: 5px;
+  border: 1px solid var(--border2); background: none;
+  color: var(--dim); font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; line-height: 1;
+}
+.wc:hover { color: var(--off-white); border-color: #3a3a3a; background: var(--surface); }
+.wc.x:hover { color: #fff; border-color: var(--red); background: var(--red); }
+
+/* ── HOME ── */
+#home {
+  position: fixed; inset: 0; padding-top: 44px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+#home::before {
+  content: '';
+  position: absolute; inset: 44px 0 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 48px 48px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+#home::after {
+  content: '';
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px; height: 400px;
+  background: radial-gradient(ellipse, rgba(246,98,52,0.07) 0%, transparent 65%);
+  pointer-events: none;
+}
+.home-inner {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+}
+
+/* ── DROP ZONE ── */
+#drop-zone {
+  width: 480px;
+  border: 1px solid var(--border2);
+  background: var(--surface);
+  padding: 52px 48px 44px;
+  text-align: center; cursor: pointer;
+  transition: all 0.2s; position: relative;
+}
+#drop-zone::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--orange);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 0.3s ease;
+}
+#drop-zone:hover::before, #drop-zone.drag-over::before { transform: scaleX(1); }
+#drop-zone:hover, #drop-zone.drag-over { border-color: #333; background: var(--surface2); }
+
+.drop-glyph {
+  width: 52px; height: 52px; margin: 0 auto 22px;
+  border: 1px solid var(--border2); background: var(--surface2);
+  display: flex; align-items: center; justify-content: center; position: relative;
+}
+.drop-glyph::after { content: ''; position: absolute; inset: -5px; border: 1px dashed var(--dim2); }
+.drop-glyph svg { width: 22px; height: 22px; opacity: 0.5; }
+.drop-title {
+  font-family: 'Mona Sans', sans-serif; font-weight: 800;
+  font-size: 20px; letter-spacing: 0.5px; color: var(--off-white); margin-bottom: 8px;
+}
+.drop-sub { font-size: 11px; color: var(--dim); line-height: 1.7; margin-bottom: 28px; letter-spacing: 0.3px; }
+.open-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 22px;
+  border: 1px solid var(--border2); background: none;
+  color: var(--gray); font-family: 'Geist', sans-serif;
+  font-size: 11px; font-weight: 500; letter-spacing: 2px;
+  cursor: pointer; transition: all 0.2s; text-transform: uppercase;
+}
+.open-btn:hover { border-color: var(--orange); color: var(--orange); background: var(--orange-dim); }
+.open-btn span { font-size: 14px; line-height: 1; }
+
+/* ── RECENT ── */
+.recent-wrap {
+  width: 480px; margin-top: 2px;
+  background: var(--surface); border: 1px solid var(--border2); border-top: none;
+}
+.recent-hdr {
+  padding: 10px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.recent-label { font-size: 9px; letter-spacing: 3px; text-transform: uppercase; color: var(--dim); }
+.clear-recent {
+  font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--dim); background: none; border: none; cursor: pointer; transition: color 0.15s;
+}
+.clear-recent:hover { color: var(--orange); }
+#recent-list { min-height: 32px; max-height: 280px; overflow-y: auto; }
+.recent-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 14px 9px 18px; cursor: pointer;
+  border-bottom: 1px solid var(--border); transition: background 0.12s;
+}
+.recent-item:last-child { border-bottom: none; }
+.recent-item:hover { background: var(--surface2); }
+.recent-item.missing { cursor: default; opacity: 0.55; }
+.recent-item.missing:hover { background: none; }
+.ri-bullet { width: 3px; height: 3px; border-radius: 50%; background: var(--orange); flex-shrink: 0; }
+.recent-item.missing .ri-bullet { background: var(--dim); }
+.ri-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ri-name {
+  font-size: 11px; color: var(--gray); font-weight: 400;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ri-meta {
+  font-size: 9px; color: var(--dim); letter-spacing: 0.3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.recent-item.missing .ri-meta { color: var(--red); }
+.ri-time { font-size: 9px; color: var(--dim2); letter-spacing: 0.5px; flex-shrink: 0; }
+.ri-x {
+  width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0;
+  border: none; background: none; color: var(--dim2); font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all 0.12s;
+}
+.ri-x:hover { color: #fff; background: var(--red); }
+.no-recent { padding: 12px 18px; font-size: 11px; color: var(--dim2); }
+
+/* ── FOOTER ── */
+.home-footer {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 16px; z-index: 2;
+}
+.hf-mark {
+  font-family: 'Mona Sans', sans-serif; font-size: 9px; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase; color: var(--dim2);
+}
+.hf-dot { width: 2px; height: 2px; border-radius: 50%; background: var(--dim2); }
+.hf-version { font-size: 9px; color: var(--dim2); letter-spacing: 1px; }
+
+/* ── VIEWER ── */
+#viewer { position: fixed; inset: 0; display: none; flex-direction: column; background: #0a0a0a; }
+#viewer.visible { display: flex; }
+#viewer.cursor-hidden { cursor: none; }
+
+#viewer-bar {
+  position: fixed; top: 0; left: 0; right: 0; height: 44px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px 0 18px;
+  background: rgba(10,10,10,0);
+  z-index: 1000;
+  -webkit-app-region: drag;
+  opacity: 0; transform: translateY(-100%);
+  transition: opacity 0.25s, transform 0.25s, background 0.25s;
+  pointer-events: none;
+}
+#viewer.bar-on #viewer-bar {
+  opacity: 1; transform: translateY(0);
+  background: rgba(10,10,10,0.94);
+  border-bottom: 1px solid var(--border);
+  pointer-events: all;
+}
+.vb-left { display: flex; align-items: center; gap: 10px; }
+.vb-icon {
+  width: 16px; height: 16px;
+  background: var(--orange);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  flex-shrink: 0;
+}
+.vb-file { font-size: 10px; color: var(--dim); letter-spacing: 1px; }
+.vb-controls { display: flex; gap: 5px; -webkit-app-region: no-drag; }
+
+#frame-wrap { flex: 1; position: relative; }
+#presentation-frame { width: 100%; height: 100%; border: none; display: block; background: #fff; }
+
+/* ── PERSISTENT BOTTOM TOOLBAR ── */
+#viewer-toolbar {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 8px;
+  background: rgba(17,17,17,0.94);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  z-index: 1001;
+  -webkit-app-region: no-drag;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+}
+.tb-btn {
+  width: 30px; height: 30px; border-radius: 6px;
+  border: 1px solid transparent; background: none;
+  color: var(--gray); font-size: 15px; cursor: pointer;
+  font-family: 'Geist', sans-serif; line-height: 1;
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+}
+.tb-btn:hover { color: var(--off-white); background: var(--surface2); border-color: var(--border2); }
+.tb-btn svg { width: 16px; height: 16px; }
+.tb-zoom {
+  min-width: 48px; text-align: center;
+  font-size: 11px; color: var(--gray); letter-spacing: 0.5px; font-variant-numeric: tabular-nums;
+}
+.tb-sep { width: 1px; height: 18px; background: var(--border2); margin: 0 5px; }
+
+/* ── LOADING (only after >1s) ── */
+#loading {
+  position: absolute; inset: 0; z-index: 1100;
+  display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  background: var(--bg);
+}
+#loading.on { display: flex; }
+.spinner {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 2px solid var(--border2); border-top-color: var(--orange);
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
+
+/* ── ERROR SCREEN ── */
+#error-screen {
+  position: absolute; inset: 0; z-index: 1100;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg); padding: 40px;
+}
+#error-screen.on { display: flex; }
+.err-glyph {
+  width: 54px; height: 54px; margin-bottom: 22px;
+  border: 1px solid var(--red); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--red); font-size: 26px; font-weight: 300;
+}
+.err-title {
+  font-family: 'Mona Sans', sans-serif; font-weight: 800;
+  font-size: 18px; letter-spacing: 0.5px; margin-bottom: 8px;
+}
+.err-file { font-size: 12px; color: var(--gray); margin-bottom: 4px; }
+.err-reason { font-size: 11px; color: var(--dim); margin-bottom: 26px; letter-spacing: 0.3px; }
+.err-actions { display: flex; gap: 10px; }
+.err-btn {
+  padding: 9px 20px;
+  border: 1px solid var(--border2); background: none;
+  color: var(--gray); font-family: 'Geist', sans-serif;
+  font-size: 11px; font-weight: 500; letter-spacing: 1.5px;
+  cursor: pointer; transition: all 0.2s; text-transform: uppercase;
+}
+.err-btn:hover { border-color: var(--orange); color: var(--orange); background: var(--orange-dim); }
+
+/* ── ABOUT MODAL ── */
+#about {
+  position: fixed; inset: 0; z-index: 2000;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.6);
+}
+#about.on { display: flex; }
+.about-card {
+  width: 360px; background: var(--surface); border: 1px solid var(--border2);
+  padding: 36px 34px 28px; text-align: center; position: relative;
+}
+.about-icon {
+  width: 40px; height: 40px; margin: 0 auto 18px;
+  background: var(--orange);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+#about-name {
+  font-family: 'Mona Sans', sans-serif; font-weight: 800;
+  font-size: 18px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px;
+}
+#about-version { font-size: 10px; color: var(--dim); letter-spacing: 1px; margin-bottom: 16px; }
+#about-desc { font-size: 11px; color: var(--gray); line-height: 1.7; margin-bottom: 22px; }
+.about-actions { display: flex; gap: 8px; justify-content: center; }
+.about-link {
+  padding: 8px 16px; border: 1px solid var(--border2); background: none;
+  color: var(--gray); font-family: 'Geist', sans-serif; font-size: 10px;
+  letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: all 0.2s;
+}
+.about-link:hover { border-color: var(--orange); color: var(--orange); background: var(--orange-dim); }
+.about-close {
+  position: absolute; top: 12px; right: 12px;
+  width: 24px; height: 24px; border: none; background: none;
+  color: var(--dim); font-size: 16px; cursor: pointer; transition: color 0.15s;
+}
+.about-close:hover { color: var(--off-white); }
+
+/* ── TOP-BAR MENU ── */
+.titlebar-right { display: flex; align-items: center; gap: 10px; -webkit-app-region: no-drag; }
+.menu-anchor { position: relative; }
+.menu-btn { font-size: 14px; }
+.menu-dropdown {
+  position: absolute; top: 34px; right: 0; min-width: 200px;
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 6px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+  display: none; flex-direction: column; z-index: 1500;
+}
+.menu-dropdown.on { display: flex; }
+.menu-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 6px;
+  border: none; background: none; cursor: pointer;
+  font-family: 'Geist', sans-serif; font-size: 12px; font-weight: 400;
+  color: var(--gray); text-align: left; transition: all 0.12s;
+}
+.menu-item:hover { background: var(--surface2); color: var(--off-white); }
+.mi-ico { width: 16px; text-align: center; font-size: 13px; opacity: 0.8; }
+.menu-sep { height: 1px; background: var(--border); margin: 5px 6px; }
+
+/* ── SHEETS (shortcuts + settings) ── */
+.sheet {
+  position: fixed; inset: 0; z-index: 2000;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.6);
+}
+.sheet.on { display: flex; }
+.sheet-card {
+  width: 384px; background: var(--surface); border: 1px solid var(--border2);
+  padding: 28px 26px; position: relative;
+}
+.sheet-title {
+  font-family: 'Mona Sans', sans-serif; font-weight: 800;
+  font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 18px;
+}
+.sheet-close {
+  position: absolute; top: 12px; right: 12px;
+  width: 24px; height: 24px; border: none; background: none;
+  color: var(--dim); font-size: 16px; cursor: pointer; transition: color 0.15s;
+}
+.sheet-close:hover { color: var(--off-white); }
+
+/* shortcuts list */
+.sc-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+}
+.sc-row:last-child { border-bottom: none; }
+.sc-label { color: var(--gray); }
+.sc-keys { display: flex; gap: 4px; }
+.kbd {
+  font-family: 'Geist', sans-serif; font-size: 10px; color: var(--gray);
+  background: var(--surface2); border: 1px solid var(--border2); border-radius: 4px;
+  padding: 2px 7px; letter-spacing: 0.5px;
+}
+
+/* settings rows */
+.set-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--border);
+}
+.set-row:last-child { border-bottom: none; }
+.set-label { font-size: 12px; color: var(--off-white); }
+.set-sub { font-size: 10px; color: var(--dim); margin-top: 3px; }
+.stepper { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.step-btn {
+  width: 24px; height: 24px; border-radius: 5px;
+  border: 1px solid var(--border2); background: none; color: var(--gray);
+  cursor: pointer; font-size: 14px; line-height: 1; transition: all 0.12s;
+}
+.step-btn:hover { color: var(--off-white); border-color: #3a3a3a; }
+.step-val { min-width: 46px; text-align: center; font-size: 12px; color: var(--off-white); font-variant-numeric: tabular-nums; }
+.toggle {
+  width: 38px; height: 22px; border-radius: 12px; flex-shrink: 0;
+  background: var(--border2); border: none; cursor: pointer; position: relative; transition: background 0.15s;
+}
+.toggle::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 16px; height: 16px; border-radius: 50%; background: var(--gray); transition: all 0.15s;
+}
+.toggle.on { background: var(--orange); }
+.toggle.on::after { left: 19px; background: #fff; }
+.set-btn {
+  padding: 7px 14px; flex-shrink: 0;
+  border: 1px solid var(--border2); background: none; color: var(--gray);
+  font-family: 'Geist', sans-serif; font-size: 10px; letter-spacing: 1.5px;
+  text-transform: uppercase; cursor: pointer; transition: all 0.2s;
+}
+.set-btn:hover { border-color: var(--red); color: #fff; background: var(--red); }
+
+/* ── PRESENTATION LOCK (pure content view) ── */
+#viewer.locked #viewer-bar,
+#viewer.locked #viewer-toolbar { display: none !important; }
+
+/* ── TOAST ── */
+#toast {
+  position: fixed; left: 50%; bottom: 72px; transform: translateX(-50%) translateY(8px);
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 16px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border2);
+  color: var(--off-white); font-size: 12px; letter-spacing: 0.3px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  z-index: 3000; opacity: 0; pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+#toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gray); flex-shrink: 0; }
+#toast.success .toast-dot { background: #3fb950; }
+#toast.error .toast-dot { background: var(--red); }
+#toast.info .toast-dot { background: var(--orange); }
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div id="home">
+  <div id="titlebar">
+    <div class="app-wordmark">
+      <div class="app-icon"></div>
+      <span class="app-name" id="app-name">Deckr</span>
+    </div>
+    <span class="titlebar-center" id="title-filename"></span>
+    <div class="titlebar-right">
+      <div class="menu-anchor">
+        <button class="wc menu-btn" id="menu-btn" onclick="toggleMenu(event)" title="Menu">⚙</button>
+        <div class="menu-dropdown" id="menu-dropdown">
+          <button class="menu-item" onclick="toggleTheme()"><span class="mi-ico" id="theme-ico">☀</span><span id="theme-label">Light mode</span></button>
+          <button class="menu-item" onclick="openShortcuts()"><span class="mi-ico">⌨</span>Keyboard Shortcuts</button>
+          <button class="menu-item" onclick="showAbout()"><span class="mi-ico">ⓘ</span>About</button>
+          <div class="menu-sep"></div>
+          <button class="menu-item" onclick="openSettings()"><span class="mi-ico">⚙</span>Settings</button>
+        </div>
+      </div>
+      <div class="win-controls">
+        <button class="wc" onclick="window.presenter.minimize()" title="Minimize">−</button>
+        <button class="wc max" onclick="window.presenter.maximize()" title="Maximize">⊡</button>
+        <button class="wc x" onclick="window.presenter.close()" title="Close">×</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="home-inner">
+    <div id="drop-zone" onclick="openFile()">
+      <div class="drop-glyph">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14,2 14,8 20,8"/>
+          <line x1="12" y1="12" x2="12" y2="18"/>
+          <polyline points="9,15 12,18 15,15"/>
+        </svg>
+      </div>
+      <div class="drop-title">Drop to Present</div>
+      <div class="drop-sub">Drag any HTML file onto this window<br>or browse your files below</div>
+      <button class="open-btn" onclick="event.stopPropagation(); openFile()"><span>+</span> Open File</button>
+    </div>
+
+    <div class="recent-wrap">
+      <div class="recent-hdr">
+        <span class="recent-label">Recent</span>
+        <button class="clear-recent" id="clear-recent" onclick="clearRecents()">Clear All</button>
+      </div>
+      <div id="recent-list"></div>
+    </div>
+  </div>
+
+  <div class="home-footer">
+    <span class="hf-mark">Deckr</span>
+    <div class="hf-dot"></div>
+    <span class="hf-version" id="footer-version">v1.0</span>
+  </div>
+</div>
+
+<!-- VIEWER -->
+<div id="viewer">
+  <div id="viewer-bar">
+    <div class="vb-left">
+      <div class="vb-icon"></div>
+      <span class="vb-file" id="viewer-filename"></span>
+    </div>
+    <div class="vb-controls">
+      <button class="wc" onclick="toggleFullscreen()" title="Fullscreen (F11)">⛶</button>
+      <button class="wc" onclick="goHome()" title="Home (Esc)">⌂</button>
+      <button class="wc" onclick="window.presenter.minimize()" title="Minimize">−</button>
+      <button class="wc max" onclick="window.presenter.maximize()" title="Maximize">⊡</button>
+      <button class="wc x" onclick="window.presenter.close()" title="Close">×</button>
+    </div>
+  </div>
+
+  <div id="frame-wrap">
+    <iframe id="presentation-frame" sandbox="allow-scripts allow-same-origin allow-modals allow-popups allow-forms"></iframe>
+
+    <!-- LOADING state -->
+    <div id="loading">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loading-text">Loading…</div>
+    </div>
+
+    <!-- ERROR state -->
+    <div id="error-screen">
+      <div class="err-glyph">!</div>
+      <div class="err-title">Couldn’t Open File</div>
+      <div class="err-file" id="err-file"></div>
+      <div class="err-reason" id="err-reason"></div>
+      <div class="err-actions">
+        <button class="err-btn" onclick="tryAgain()">Try Again</button>
+        <button class="err-btn" id="err-locate" onclick="locateFile()">Locate File…</button>
+        <button class="err-btn" onclick="goHome()">Home</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Persistent bottom toolbar -->
+  <div id="viewer-toolbar">
+    <button class="tb-btn" onclick="zoomOut()" title="Zoom Out (Ctrl −)">−</button>
+    <span class="tb-zoom" id="zoom-label">100%</span>
+    <button class="tb-btn" onclick="zoomIn()" title="Zoom In (Ctrl +)">+</button>
+    <button class="tb-btn" onclick="resetZoom()" title="Reset Zoom (Ctrl 0)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M3 12a9 9 0 1 1 3 6.7"/><polyline points="3 21 3 15 9 15"/>
+      </svg>
+    </button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="openFile()" title="Open File (Ctrl O)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+    </button>
+    <button class="tb-btn" onclick="reloadFile()" title="Reload (Ctrl R)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/>
+      </svg>
+    </button>
+    <button class="tb-btn" onclick="goHome()" title="Home (Esc)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>
+      </svg>
+    </button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" onclick="exportPDF()" title="Export Smart PDF (Ctrl P)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 18h6M9 12h2"/>
+      </svg>
+    </button>
+    <button class="tb-btn" onclick="toggleLock()" title="Presentation Lock (Ctrl L)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"><span class="toast-dot"></span><span id="toast-msg"></span></div>
+
+<!-- ABOUT -->
+<div id="about" onclick="if(event.target===this) hideAbout()">
+  <div class="about-card">
+    <button class="about-close" onclick="hideAbout()">×</button>
+    <div class="about-icon"></div>
+    <div id="about-name">Deckr</div>
+    <div id="about-version">Version 1.0.0</div>
+    <div id="about-desc"></div>
+    <div class="about-actions">
+      <button class="about-link" id="about-github">GitHub</button>
+      <button class="about-link" onclick="hideAbout()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- KEYBOARD SHORTCUTS -->
+<div id="shortcuts" class="sheet" onclick="if(event.target===this) closeSheet('shortcuts')">
+  <div class="sheet-card">
+    <button class="sheet-close" onclick="closeSheet('shortcuts')">×</button>
+    <div class="sheet-title">Keyboard Shortcuts</div>
+    <div class="sc-row"><span class="sc-label">Open HTML</span><span class="sc-keys"><span class="kbd">Ctrl</span><span class="kbd">O</span></span></div>
+    <div class="sc-row"><span class="sc-label">Open Folder</span><span class="sc-keys"><span class="kbd">Ctrl</span><span class="kbd">Shift</span><span class="kbd">O</span></span></div>
+    <div class="sc-row"><span class="sc-label">Reload</span><span class="sc-keys"><span class="kbd">Ctrl</span><span class="kbd">R</span></span></div>
+    <div class="sc-row"><span class="sc-label">Export PDF</span><span class="sc-keys"><span class="kbd">Ctrl</span><span class="kbd">P</span></span></div>
+    <div class="sc-row"><span class="sc-label">Close file</span><span class="sc-keys"><span class="kbd">Ctrl</span><span class="kbd">W</span></span></div>
+    <div class="sc-row"><span class="sc-label">Zoom in / out / reset</span><span class="sc-keys"><span class="kbd">Ctrl</span><span class="kbd">=</span><span class="kbd">−</span><span class="kbd">0</span></span></div>
+    <div class="sc-row"><span class="sc-label">Presentation Lock</span><span class="sc-keys"><span class="kbd">Ctrl</span><span class="kbd">L</span></span></div>
+    <div class="sc-row"><span class="sc-label">Toggle fullscreen</span><span class="sc-keys"><span class="kbd">F</span><span class="kbd">F11</span></span></div>
+    <div class="sc-row"><span class="sc-label">Next slide</span><span class="sc-keys"><span class="kbd">Space</span><span class="kbd">→</span></span></div>
+    <div class="sc-row"><span class="sc-label">Previous slide</span><span class="sc-keys"><span class="kbd">←</span></span></div>
+    <div class="sc-row"><span class="sc-label">First / last slide</span><span class="sc-keys"><span class="kbd">Home</span><span class="kbd">End</span></span></div>
+    <div class="sc-row"><span class="sc-label">Exit lock → fullscreen → Home</span><span class="sc-keys"><span class="kbd">Esc</span></span></div>
+    <div class="sc-row"><span class="sc-label">This help</span><span class="sc-keys"><span class="kbd">?</span><span class="kbd">F1</span></span></div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settings" class="sheet" onclick="if(event.target===this) closeSheet('settings')">
+  <div class="sheet-card">
+    <button class="sheet-close" onclick="closeSheet('settings')">×</button>
+    <div class="sheet-title">Settings</div>
+    <div class="set-row">
+      <div><div class="set-label">Default zoom</div><div class="set-sub">Starting zoom when a deck opens</div></div>
+      <div class="stepper">
+        <button class="step-btn" onclick="changeDefaultZoom(-1)">−</button>
+        <span class="step-val" id="set-zoom-val">100%</span>
+        <button class="step-btn" onclick="changeDefaultZoom(1)">+</button>
+      </div>
+    </div>
+    <div class="set-row">
+      <div><div class="set-label">Remember window size</div><div class="set-sub">Restore size &amp; position on launch</div></div>
+      <button class="toggle" id="set-remember" onclick="toggleRemember()"></button>
+    </div>
+    <div class="set-row">
+      <div><div class="set-label">Recent files</div><div class="set-sub">Clear the recent files list</div></div>
+      <button class="set-btn" onclick="clearRecentsFromSettings()">Clear</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let APP_NAME = 'Deckr';
+let GITHUB = 'https://github.com/majorassembly/deckr';
+
+// ── State ──
+let currentFile = null;
+let currentUrl = null;        // file:// URL of the open deck
+let zoom = 1;                 // persists across files for the session
+let locked = false;           // presentation lock active
+let activityTimer = null;     // cursor auto-hide
+let loadingTimer = null;      // delayed loading indicator
+let pendingScroll = null;     // scroll position to restore after a reload
+let zoomPersistTimer = null;  // debounce writing zoom to settings
+let assetErrorTimer = null;   // debounce broken-asset toast
+
+const $ = (id) => document.getElementById(id);
+const isViewing = () => $('viewer').classList.contains('visible');
+const escapeHtml = (s) => (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function formatTime(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - ts;
+  const min = 60000, hr = 3600000, day = 86400000;
+  if (diff < min) return 'just now';
+  if (diff < hr) return Math.floor(diff / min) + 'm ago';
+  if (diff < day) return Math.floor(diff / hr) + 'h ago';
+  if (diff < 7 * day) return Math.floor(diff / day) + 'd ago';
+  return new Date(ts).toLocaleDateString();
+}
+
+// ── Recent files ──
+async function renderRecent() {
+  const el = $('recent-list');
+  const list = await window.presenter.getRecent();
+  $('clear-recent').style.display = list.length ? '' : 'none';
+  if (!list.length) { el.innerHTML = '<div class="no-recent">No recent files yet — open one to get started</div>'; return; }
+  el.innerHTML = '';
+  list.forEach(f => {
+    const item = document.createElement('div');
+    item.className = 'recent-item' + (f.exists ? '' : ' missing');
+    item.title = f.path;
+    item.innerHTML =
+      '<div class="ri-bullet"></div>' +
+      '<div class="ri-main">' +
+        '<span class="ri-name">' + escapeHtml(f.name) + '</span>' +
+        '<span class="ri-meta">' + escapeHtml(f.dir) + (f.exists ? '' : ' · not found') + '</span>' +
+      '</div>' +
+      '<span class="ri-time">' + formatTime(f.time) + '</span>' +
+      '<button class="ri-x" title="Remove">×</button>';
+    item.addEventListener('click', (e) => {
+      if (e.target.classList.contains('ri-x')) return;
+      if (f.exists) openRecentPath(f.path);
+    });
+    item.addEventListener('contextmenu', (e) => { e.preventDefault(); removeRecent(f.path); });
+    item.querySelector('.ri-x').addEventListener('click', (e) => { e.stopPropagation(); removeRecent(f.path); });
+    el.appendChild(item);
+  });
+}
+async function removeRecent(p) { await window.presenter.removeRecent(p); renderRecent(); }
+async function clearRecents() { await window.presenter.clearRecent(); renderRecent(); }
+
+// ── Opening ──
+function openFile() { window.presenter.openDialog(); }
+function openRecentPath(p) { window.presenter.openPath(p); }
+function reloadFile() { window.presenter.reloadFile(); focusDeck(); }
+function locateFile() { window.presenter.locateFile(); }
+function tryAgain() { if (currentFile) window.presenter.openPath(currentFile); }
+
+// ── Deck rendering (success state) ──
+// Decks load over file:// so relative assets (images/fonts/css/js) resolve and
+// folder-based presentations work. opts: { reload, preserveScroll }
+function presentFile({ filePath, fileUrl }, opts) {
+  opts = opts || {};
+  const frame = $('presentation-frame');
+
+  if (opts.preserveScroll) {
+    try { pendingScroll = { x: frame.contentWindow.scrollX, y: frame.contentWindow.scrollY }; }
+    catch { pendingScroll = null; }
+  } else {
+    pendingScroll = null;
+  }
+
+  currentFile = filePath;
+  currentUrl = fileUrl;
+  const name = filePath.split(/[\\/]/).pop();
+  $('viewer-filename').textContent = name;
+  document.title = name + ' — ' + APP_NAME;
+  hideError();
+
+  // Loading indicator appears only if rendering takes longer than 1s.
+  clearTimeout(loadingTimer);
+  $('loading-text').textContent = 'Loading ' + name + '…';
+  loadingTimer = setTimeout(() => $('loading').classList.add('on'), 1000);
+
+  frame.onload = () => {
+    clearTimeout(loadingTimer);
+    $('loading').classList.remove('on');
+    wireIframe(frame);
+    applyZoom();
+    if (pendingScroll) { try { frame.contentWindow.scrollTo(pendingScroll.x, pendingScroll.y); } catch {} }
+    focusDeck();
+  };
+
+  const sameDoc = frame.getAttribute('data-url') === fileUrl;
+  if (opts.reload || sameDoc) {
+    // Re-fetch the same document from disk (auto-reload / manual reload / reopen).
+    try { frame.contentWindow.location.reload(); }
+    catch { frame.src = fileUrl; }
+  } else {
+    frame.src = fileUrl;
+  }
+  frame.setAttribute('data-url', fileUrl);
+
+  $('home').style.display = 'none';
+  $('viewer').classList.add('visible');
+  startActivityWatch();
+  notifyState();
+}
+
+// Same-origin (file://, webSecurity off) → attach listeners + watch for broken assets.
+function wireIframe(frame) {
+  try {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    doc.addEventListener('mousemove', (e) => onActivity(e.clientY), { passive: true });
+    doc.addEventListener('contextmenu', (e) => e.preventDefault());
+    // Capturing 'error' catches failed <img>/<script>/<link> loads (missing assets).
+    doc.defaultView.addEventListener('error', (e) => {
+      if (e && e.target && e.target !== doc.defaultView) flagAssetError();
+    }, true);
+  } catch {}
+}
+function flagAssetError() {
+  clearTimeout(assetErrorTimer);
+  assetErrorTimer = setTimeout(() => showToast('info', 'Some assets couldn’t be loaded'), 400);
+}
+function focusDeck() { try { $('presentation-frame').contentWindow.focus(); } catch {} }
+
+// ── Zoom (applied to the deck's inner document so content actually scales) ──
+function applyZoom() {
+  const frame = $('presentation-frame');
+  try {
+    const doc = frame.contentDocument;
+    if (doc && doc.documentElement) doc.documentElement.style.zoom = zoom;
+  } catch {
+    frame.style.zoom = zoom; // cross-origin fallback
+  }
+  $('zoom-label').textContent = Math.round(zoom * 100) + '%';
+  persistZoom();
+}
+function setZoom(z)  { zoom = Math.max(0.25, Math.min(4, +(+z).toFixed(2))); applyZoom(); }
+function zoomIn()    { setZoom(zoom * 1.1); }
+function zoomOut()   { setZoom(zoom / 1.1); }
+function resetZoom() { setZoom(1); }
+
+// Remember zoom across launches (shares the Settings "Default zoom" value).
+function persistZoom() {
+  clearTimeout(zoomPersistTimer);
+  zoomPersistTimer = setTimeout(() => {
+    settings.defaultZoom = zoom;
+    window.presenter.setSettings({ defaultZoom: zoom });
+  }, 400);
+}
+
+// ── Fit modes ── measure natural content size (at zoom 1) vs the frame viewport.
+function fitTo(mode) {
+  const frame = $('presentation-frame');
+  const wrap = $('frame-wrap');
+  let doc;
+  try { doc = frame.contentDocument; } catch { doc = null; }
+  if (!doc || !doc.documentElement) return;
+  const el = doc.documentElement;
+  const prev = el.style.zoom;
+  el.style.zoom = '1';
+  const cw = Math.max(el.scrollWidth, doc.body ? doc.body.scrollWidth : 0);
+  const ch = Math.max(el.scrollHeight, doc.body ? doc.body.scrollHeight : 0);
+  el.style.zoom = prev;
+  if (!cw || !ch) return;
+  const availW = wrap.clientWidth, availH = wrap.clientHeight;
+  let z;
+  if (mode === 'width') z = availW / cw;
+  else if (mode === 'height') z = availH / ch;
+  else z = Math.min(availW / cw, availH / ch);
+  setZoom(z);
+}
+function fitWindow() { fitTo('window'); }
+function fitWidth()  { fitTo('width'); }
+function fitHeight() { fitTo('height'); }
+
+// ── Navigation ──
+function goHome() {
+  const frame = $('presentation-frame');
+  locked = false;
+  $('viewer').classList.remove('visible', 'bar-on', 'cursor-hidden', 'locked');
+  $('home').style.display = '';
+  frame.onload = null;
+  frame.removeAttribute('data-url');
+  frame.src = 'about:blank';
+  hideError();
+  clearTimeout(activityTimer);
+  clearTimeout(loadingTimer);
+  $('loading').classList.remove('on');
+  if (document.fullscreenElement) document.exitFullscreen();
+  window.presenter.exitFullscreen();
+  window.presenter.closeFile();
+  currentFile = null;
+  currentUrl = null;
+  document.title = APP_NAME;
+  notifyState();
+  renderRecent();
+}
+function toggleFullscreen() { window.presenter.toggleFullscreen(); }
+
+// ── Presentation Lock (pure content view) ──
+function toggleLock() { if (isViewing()) setLock(!locked); }
+function setLock(on) {
+  locked = on;
+  $('viewer').classList.toggle('locked', on);
+  if (on) setCursorHidden(true);
+  notifyState();
+}
+function exitLock() { if (locked) setLock(false); }
+
+// Tell main whether a deck is open / locked (for Escape priority + bare-F routing).
+function notifyState() { window.presenter.setViewerState(isViewing(), locked); }
+
+// ── PDF export / reveal (toolbar → main) ──
+function exportPDF() { window.presenter.exportPDF('smart'); }
+function revealFile() { window.presenter.revealFile(); }
+
+// ── Toast feedback ──
+let toastTimer = null;
+function showToast(type, message) {
+  const t = $('toast');
+  t.className = type || 'info';
+  $('toast-msg').textContent = message;
+  t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), 2500);
+}
+
+// ── Error state ──
+function showError({ filePath, reason, notFound }) {
+  currentFile = filePath || currentFile;
+  $('home').style.display = 'none';
+  $('viewer').classList.add('visible');
+  clearTimeout(loadingTimer);
+  $('loading').classList.remove('on');
+  $('err-file').textContent = (filePath || '').split(/[\\/]/).pop();
+  $('err-reason').textContent = reason || 'Unknown error.';
+  $('err-locate').style.display = notFound ? '' : 'none';
+  $('error-screen').classList.add('on');
+  notifyState();
+}
+function hideError() { $('error-screen').classList.remove('on'); }
+
+// ── Cursor auto-hide + top-bar reveal near the top edge ──
+function startActivityWatch() { onActivity(9999); }
+function onActivity(y) {
+  if (!isViewing()) return;
+  setCursorHidden(false);
+  clearTimeout(activityTimer);
+  activityTimer = setTimeout(() => setCursorHidden(true), 3000);
+  // Top titlebar reveals only when the pointer is near the top edge.
+  if (typeof y === 'number' && y < 64) $('viewer').classList.add('bar-on');
+  else $('viewer').classList.remove('bar-on');
+}
+function setCursorHidden(hidden) {
+  const v = $('viewer');
+  v.classList.toggle('cursor-hidden', hidden);
+  if (hidden) v.classList.remove('bar-on');
+  // Hide the cursor inside the deck document too.
+  try {
+    const doc = $('presentation-frame').contentDocument;
+    if (doc && doc.head) {
+      let s = doc.getElementById('__cursor_hide');
+      if (hidden && !s) {
+        s = doc.createElement('style');
+        s.id = '__cursor_hide';
+        s.textContent = '*{cursor:none!important}';
+        doc.head.appendChild(s);
+      } else if (!hidden && s) { s.remove(); }
+    }
+  } catch {}
+}
+
+// ── About ──
+async function showAbout() {
+  const info = await window.presenter.appInfo();
+  $('about-name').textContent = info.name;
+  $('about-version').textContent = 'Version ' + info.version;
+  $('about-desc').textContent = info.description || '';
+  $('about').classList.add('on');
+}
+function hideAbout() { $('about').classList.remove('on'); }
+
+// ── Drag & drop ──
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (!f || !f.path) return;
+  window.presenter.openPath(f.path); // main resolves both HTML files and folders
+});
+const dz = $('drop-zone');
+dz.addEventListener('dragenter', () => dz.classList.add('drag-over'));
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', () => dz.classList.remove('drag-over'));
+
+// Kill the default Chromium context menu everywhere (recent items handle their own).
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// Parent-document pointer activity (over the bars/toolbar; iframe wires its own).
+document.addEventListener('mousemove', e => onActivity(e.clientY), { passive: true });
+
+// Escape fallback when the parent document (not the deck) holds focus.
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (anyOverlayOpen()) { closeAllOverlays(); return; }
+    if (locked) { exitLock(); return; }
+    if (isViewing() && !$('error-screen').classList.contains('on')) goHome();
+  } else if (e.key === '?') {
+    openShortcuts();
+  }
+});
+
+// ── Events from main ──
+window.presenter.onLoadFile(data => presentFile(data, { reload: false }));
+window.presenter.onFileUpdated(data => presentFile(data, { reload: true, preserveScroll: true }));
+window.presenter.onFileError(err => showError(err));
+window.presenter.onToast(d => showToast(d.type, d.message));
+window.presenter.onRecentChanged(() => renderRecent());
+window.presenter.onMaximizeChange(max => {
+  document.querySelectorAll('.wc.max').forEach(b => {
+    b.textContent = max ? '❐' : '⊡';
+    b.title = max ? 'Restore' : 'Maximize';
+  });
+});
+window.presenter.onFullscreenChange(fs => { if (fs) onActivity(9999); });
+window.presenter.onMenuCommand(cmd => {
+  switch (cmd) {
+    case 'open': openFile(); break;
+    case 'open-folder': window.presenter.openFolder(); break;
+    case 'about': showAbout(); break;
+    case 'shortcuts': openShortcuts(); break;
+    case 'zoom-in': if (isViewing()) zoomIn(); break;
+    case 'zoom-out': if (isViewing()) zoomOut(); break;
+    case 'zoom-reset': if (isViewing()) resetZoom(); break;
+    case 'fit-window': if (isViewing()) fitWindow(); break;
+    case 'fit-width': if (isViewing()) fitWidth(); break;
+    case 'fit-height': if (isViewing()) fitHeight(); break;
+    case 'toggle-lock': toggleLock(); break;
+    case 'exit-lock': exitLock(); break;
+    case 'home':
+    case 'close-file': if (isViewing()) goHome(); break;
+  }
+});
+
+// ── Top-bar menu / theme / settings / shortcuts ──
+let settings = { theme: 'dark', defaultZoom: 1, rememberWindowSize: true };
+
+function toggleMenu(e) { e.stopPropagation(); $('menu-dropdown').classList.toggle('on'); }
+function closeMenu() { $('menu-dropdown').classList.remove('on'); }
+document.addEventListener('click', closeMenu); // any outside click closes the menu
+
+function applyTheme(theme) {
+  settings.theme = theme;
+  document.documentElement.setAttribute('data-theme', theme);
+  const light = theme === 'light';
+  $('theme-label').textContent = light ? 'Dark mode' : 'Light mode';
+  $('theme-ico').textContent = light ? '☾' : '☀';
+}
+function toggleTheme() {
+  applyTheme(settings.theme === 'dark' ? 'light' : 'dark');
+  window.presenter.setSettings({ theme: settings.theme });
+}
+
+function openShortcuts() { closeMenu(); $('shortcuts').classList.add('on'); }
+function openSettings() { closeMenu(); reflectSettings(); $('settings').classList.add('on'); }
+function closeSheet(id) { $(id).classList.remove('on'); }
+
+function reflectSettings() {
+  $('set-zoom-val').textContent = Math.round((settings.defaultZoom || 1) * 100) + '%';
+  $('set-remember').classList.toggle('on', !!settings.rememberWindowSize);
+}
+function changeDefaultZoom(dir) {
+  let z = (settings.defaultZoom || 1) + dir * 0.25;
+  z = Math.max(0.25, Math.min(4, +z.toFixed(2)));
+  settings.defaultZoom = z;
+  reflectSettings();
+  window.presenter.setSettings({ defaultZoom: z });
+}
+function toggleRemember() {
+  settings.rememberWindowSize = !settings.rememberWindowSize;
+  reflectSettings();
+  window.presenter.setSettings({ rememberWindowSize: settings.rememberWindowSize });
+}
+async function clearRecentsFromSettings() { await window.presenter.clearRecent(); renderRecent(); }
+
+function anyOverlayOpen() {
+  return $('menu-dropdown').classList.contains('on') ||
+         $('shortcuts').classList.contains('on') ||
+         $('settings').classList.contains('on') ||
+         $('about').classList.contains('on');
+}
+function closeAllOverlays() { closeMenu(); closeSheet('shortcuts'); closeSheet('settings'); hideAbout(); }
+
+// ── Init ──
+window.presenter.appInfo().then(info => {
+  APP_NAME = info.name;
+  GITHUB = info.github;
+  $('app-name').textContent = info.name;
+  $('footer-version').textContent = 'v' + info.version;
+  document.title = APP_NAME;
+});
+window.presenter.getSettings().then(s => {
+  settings = s;
+  applyTheme(s.theme || 'dark');
+  zoom = s.defaultZoom || 1; // session zoom starts at the configured default
+  reflectSettings();
+});
+$('about-github').addEventListener('click', () => window.presenter.openExternal(GITHUB));
+renderRecent();
+</script>
+</body>
+</html>

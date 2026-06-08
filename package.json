@@ -1,0 +1,35 @@
+{
+  "name": "deckr",
+  "version": "1.0.0",
+  "description": "Present HTML decks like a native desktop app",
+  "author": "Major Assembly",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist-mac": "electron-builder --mac",
+    "dist-win": "electron-builder --win",
+    "dist-all": "electron-builder --mac --win"
+  },
+  "build": {
+    "appId": "com.majorassembly.deckr",
+    "productName": "Deckr",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.png",
+      "target": [{"target": "dmg", "arch": ["x64", "arm64"]}]
+    },
+    "win": {
+      "icon": "assets/icon.png",
+      "target": [{"target": "nsis", "arch": ["x64"]}]
+    },
+    "fileAssociations": [
+      {"ext": "html", "name": "HTML Document", "description": "HTML Document", "role": "Viewer", "icon": "assets/icon.png"},
+      {"ext": "htm", "name": "HTML Document", "description": "HTML Document", "role": "Viewer", "icon": "assets/icon.png"}
+    ],
+    "files": ["main.js", "preload.js", "pdf-export.js", "renderer/**/*", "assets/**/*"]
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}
